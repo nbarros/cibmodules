@@ -1,0 +1,16 @@
+{
+  "cib": {
+    "sockets": {
+      "receiver": {
+        "description": "Settings to configure the conditions for the data transmission socket",
+        "host": "localhost",
+        "port": 8992
+      }
+    },
+    "trigger_bit": "0x4",
+    "timing": {
+      "description": "Configuration parameters for the CIB timing system endpoint",
+      "address": "0x80"
+    } 
+  }
+}

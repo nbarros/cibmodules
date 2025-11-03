@@ -803,9 +803,9 @@ namespace dunedaq::cibmodules {
 
     module_info.num_control_messages_sent = m_num_control_messages_sent.load();
     module_info.num_control_responses_received = m_num_control_responses_received.load();
-    module_info.cib_hardware_run_status = m_is_running;
-    module_info.cib_hardware_configuration_status = m_is_configured;
-    module_info.cib_num_triggers_received = m_num_total_triggers;
+    module_info.hardware_running = m_is_running;
+    module_info.hardware_configured = m_is_configured;
+    module_info.num_triggers_received = m_num_total_triggers;
 
     module_info.last_readout_timestamp = m_last_readout_timestamp.load();
     // -- need to define these counters (and set the code to update them
