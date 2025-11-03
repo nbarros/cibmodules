@@ -6,6 +6,12 @@ include(CMakeFindDependencyMacro)
 # Insert find_dependency() calls for your package's dependencies in
 # the place of this comment. Make sure they match up with the
 # find_package calls in your package's CMakeLists.txt file
+find_dependency(rcif)
+find_dependency(appfwk)
+find_dependency(opmonlib)
+find_dependency(logging)
+find_dependency(ers)
+find_dependency(hsilibs)
 
 
 
