@@ -190,7 +190,7 @@ namespace dunedaq::cibmodules {
       //
       // monitoring data/information
       //
-      //      std::deque<uint> m_buffer_counts; // NOLINT(build/unsigned)
+      std::deque<uint> m_buffer_counts; // NOLINT(build/unsigned)
       std::shared_mutex m_buffer_counts_mutex;
       void update_buffer_counts(uint new_count); // NOLINT(build/unsigned)
       double read_average_buffer_counts();
