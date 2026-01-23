@@ -153,18 +153,34 @@ namespace dunedaq::cibmodules {
       std::ofstream m_calibration_file;
       std::chrono::steady_clock::time_point m_last_calibration_file_update;
 
+      //
       // metric utilities
+      //
+      // -- these have to match the protobuf definition in CIBModuleInfo.proto
       using general_metric_t = dunedaq::cibmodules::opmon::CIBModuleInfo;
+      using const_message_counter_t = std::invoke_result<decltype(&general_metric_t::num_control_messages_sent), general_metric_t>::type;
 
-      using const_total_trigger_counter_t = std::invoke_result<decltype(&general_metric_t::total_trigger_count), general_metric_t>::type;
-      
-      std::atomic<std::remove_const<const_total_trigger_counter_t>::type> m_total_trigger_counter;
-      // std::atomic<unsigned long> m_run_trigger_counter = 0;
-      std::atomic<trigger_counter_t> m_run_trigger_counter = 0;
-      std::atomic<unsigned long> m_num_total_triggers;
+      using message_counter_t = std::remove_const<const_message_counter_t>::type;
+      std::atomic<message_counter_t> m_num_control_messages_sent = 0;
+      std::atomic<message_counter_t> m_num_control_responses_received = 0;
 
-      size_t m_trigger_range = 20;
+      using message_status_t = std::invoke_result<decltype(&general_metric_t::hardware_running), general_metric_t>::type;
 
+      std::atomic<std::remove_const<message_status_t>::type> m_is_running = false;
+      std::atomic<std::remove_const<message_status_t>::type> m_is_configured = false;
+
+      using const_total_trigger_counter_t = std::invoke_result<decltype(&general_metric_t::num_total_triggers_received), general_metric_t>::type;
+      std::atomic<std::remove_const<const_total_trigger_counter_t>::type> m_num_total_triggers_received;
+
+      using const_run_trigger_counter_t = std::invoke_result<decltype(&general_metric_t::num_run_triggers_received), general_metric_t>::type;
+      std::atomic<std::remove_const<const_run_trigger_counter_t>::type> m_num_run_triggers_received;
+
+      // using const_hsi_trigger_counter_t = std::invoke_result<decltype(&general_metric_t::sent_hsi_events_counter), general_metric_t>::type;
+      // std::atomic<std::remove_const<const_hsi_trigger_counter_t>::type> m_sent_hsi_events_counter;
+      // std::atomic<std::remove_const<const_hsi_trigger_counter_t>::type> m_failed_to_send_hsi_events_counter;
+
+      // size_t m_trigger_range = 20;
+// 
       //
       //
       // monitoring data/information
@@ -177,11 +193,6 @@ namespace dunedaq::cibmodules {
       //
       // DAQ-CIB communication statistics
       //
-      using const_message_counter_t = std::invoke_result<decltype(&general_metric_t::num_control_messages_sent),                                  general_metric_t>::type;
-      
-      using message_counter_t = std::remove_const<const_message_counter_t>::type;
-      std::atomic<message_counter_t> m_num_control_messages_sent = 0;
-      std::atomic<message_counter_t> m_num_control_responses_received = 0;
 
       ///
       ///
@@ -189,7 +200,7 @@ namespace dunedaq::cibmodules {
       //
       // trigger bit to be written into the HSI event
       //
-      uint32_t m_module_instance;
+      // uint32_t m_module_instance;
       uint32_t m_trigger_bit;
       // flag to hold the start_run until the receiver is ready
       std::atomic<bool> m_receiver_ready;

@@ -13,7 +13,7 @@
 #include "appmodel/CIBConf.hpp"
 #include "appmodel/CIBCalibrationStream.hpp"
 #include "appmodel/CIBoardConf.hpp"
-#include "appmodel/CIBTrigger.hpp"
+// #include "appmodel/CIBTrigger.hpp"
 
 #include "CIBModule.hpp"
 #include "CIBModuleIssues.hpp"
@@ -63,15 +63,17 @@ namespace dunedaq::cibmodules {
                 , m_calibration_prefix("")
                 , m_calibration_file_interval(std::chrono::minutes(15))
                 // metric utilities
-                , m_total_trigger_counter(0)
-                , m_run_trigger_counter(0)
-                , m_num_total_triggers(0)
-
                 , m_num_control_messages_sent(0)
                 , m_num_control_responses_received(0)
+                , m_is_running(false)
+                , m_is_configured(false)
+                , m_num_total_triggers_received(0)
+                , m_num_run_triggers_received(0)
+                , m_sent_hsi_events_counter(0)
+                , m_failed_to_send_hsi_events_counter(0)
 
                 // unsure we actually need this
-                , m_module_instance(0)
+                // , m_module_instance(0)
                 , m_trigger_bit(0)
                 , m_receiver_ready(false)
   {
@@ -278,6 +280,7 @@ namespace dunedaq::cibmodules {
         throw CIBModuleError(ERS_HERE, msg.str());
       }
       send_config(config.dump());
+      m_is_configured.store(true);
     }
 
     void
@@ -295,7 +298,8 @@ namespace dunedaq::cibmodules {
       // Set this to false early so it doesn't interfere with the start
       m_stop_requested.store(false);
       m_run_number.store(startobj.at("run").get<daqdataformats::run_number_t>());
-      m_total_trigger_counter.store(0);
+      // reset the metrics/counters
+      m_num_run_triggers_received.store(0);
 
       TLOG_DEBUG(TLVL_CIB_INFO) << get_name() << ": Sending start of run command";
       m_thread_.start_working_thread();
@@ -327,7 +331,7 @@ namespace dunedaq::cibmodules {
       cmd["run_number"] = m_run_number.load();
 
       if (send_message(cmd.dump()))
-      {
+      {        
         m_is_running.store(true);
         TLOG() << get_name() << ": CIB run started successfully";
       }
@@ -599,8 +603,8 @@ namespace dunedaq::cibmodules {
                                  m_run_number);
 
       send_hsi_event(event);
-
-      if ( connection_closed )
+      m_sent_hsi_events_counter++;
+     if (connection_closed)
       {
         break ;
       }
@@ -845,9 +849,9 @@ namespace dunedaq::cibmodules {
     module_info.num_control_responses_received = m_num_control_responses_received.load();
     module_info.hardware_running = m_is_running;
     module_info.hardware_configured = m_is_configured;
-    module_info.num_triggers_received = m_num_total_triggers;
+    module_info.num_total_triggers_received = m_num_total_triggers_received.load();
+    module_info.num_run_triggers_received = m_num_run_triggers_received.load();
 
-    module_info.last_readout_timestamp = m_last_readout_timestamp.load();
     // -- need to define these counters (and set the code to update them
     module_info.sent_hsi_events_counter = m_sent_counter.load();
     module_info.failed_to_send_hsi_events_counter = m_failed_to_send_counter.load();
