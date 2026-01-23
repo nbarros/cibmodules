@@ -842,7 +842,7 @@ namespace dunedaq::cibmodules {
 
   void CIBModule::generate_opmon_data()
   {
-    dunedaq::cibmodules::CIBModuleInfo module_info;
+    dunedaq::cibmodules::opmon::CIBModuleInfo module_info;
 
     module_info.num_control_messages_sent = m_num_control_messages_sent.load();
     module_info.num_control_responses_received = m_num_control_responses_received.load();
