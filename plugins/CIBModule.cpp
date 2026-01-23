@@ -844,18 +844,18 @@ namespace dunedaq::cibmodules {
   {
     dunedaq::cibmodules::opmon::CIBModuleInfo module_info;
 
-    module_info.num_control_messages_sent = m_num_control_messages_sent.load();
-    module_info.num_control_responses_received = m_num_control_responses_received.load();
-    module_info.hardware_running = m_is_running;
-    module_info.hardware_configured = m_is_configured;
-    module_info.num_total_triggers_received = m_num_total_triggers_received.load();
-    module_info.num_run_triggers_received = m_num_run_triggers_received.load();
+    module_info.set_num_control_messages_sent(m_num_control_messages_sent.load());
+    module_info.set_num_control_responses_received(m_num_control_responses_received.load());
+    module_info.set_hardware_running(m_is_running.load());
+    module_info.set_hardware_configured(m_is_configured.load());
+    module_info.set_num_total_triggers_received(m_num_total_triggers_received.load());
+    module_info.set_num_run_triggers_received(m_num_run_triggers_received.load());
 
     // -- need to define these counters (and set the code to update them
-    module_info.sent_hsi_events_counter = m_sent_counter.load();
-    module_info.failed_to_send_hsi_events_counter = m_failed_to_send_counter.load();
-    module_info.last_sent_timestamp = m_last_sent_timestamp.load();
-    module_info.average_buffer_occupancy = read_average_buffer_counts();
+    module_info.set_sent_hsi_events_counter(m_sent_counter.load());
+    module_info.set_failed_to_send_hsi_events_counter(m_failed_to_send_counter.load());
+    //module_info.set_last_sent_timestamp(m_last_sent_timestamp.load());
+    module_info.set_average_buffer_occupancy(read_average_buffer_counts());
 
     publish(std::move(module_info));
 
