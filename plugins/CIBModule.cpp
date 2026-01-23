@@ -133,7 +133,7 @@ namespace dunedaq::cibmodules {
       {
         //FIXME: Where does this CIB come from? I am assuming that is comes from the
         // names of the HSISignalWindow objects in the configuration 
-        if ( con->UID().find("cib")!=std::string::npos)
+        if ( con->UID().find("CIB")!=std::string::npos)
         {
           m_cib_hsi_data_sender = iom->get_sender<hsi_frame_t>(con->UID());
         }
