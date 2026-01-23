@@ -174,11 +174,11 @@ namespace dunedaq::cibmodules {
       using const_run_trigger_counter_t = std::invoke_result<decltype(&general_metric_t::num_run_triggers_received), general_metric_t>::type;
       std::atomic<std::remove_const<const_run_trigger_counter_t>::type> m_num_run_triggers_received;
 
-      using const_total_trigger_counter_t = std::invoke_result<decltype(&general_metric_t::num_total_triggers_received), general_metric_t>::type;
-      std::atomic<std::remove_const<const_total_trigger_counter_t>::type> m_num_total_triggers_received;
+      // using const_total_trigger_counter_t = std::invoke_result<decltype(&general_metric_t::num_total_triggers_received), general_metric_t>::type;
+      // std::atomic<std::remove_const<const_total_trigger_counter_t>::type> m_num_total_triggers_received;
 
-      using const_run_trigger_counter_t = std::invoke_result<decltype(&general_metric_t::num_run_triggers_received), general_metric_t>::type;
-      std::atomic<std::remove_const<const_run_trigger_counter_t>::type> m_num_run_triggers_received;
+      // using const_run_trigger_counter_t = std::invoke_result<decltype(&general_metric_t::num_run_triggers_received), general_metric_t>::type;
+      // std::atomic<std::remove_const<const_run_trigger_counter_t>::type> m_num_run_triggers_received;
 
       // using const_hsi_trigger_counter_t = std::invoke_result<decltype(&general_metric_t::sent_hsi_events_counter), general_metric_t>::type;
       // std::atomic<std::remove_const<const_hsi_trigger_counter_t>::type> m_sent_hsi_events_counter;
@@ -190,7 +190,7 @@ namespace dunedaq::cibmodules {
       //
       // monitoring data/information
       //
-      //      std::deque<uint> m_buffer_counts; // NOLINT(build/unsigned)
+      std::deque<uint> m_buffer_counts; // NOLINT(build/unsigned)
       std::shared_mutex m_buffer_counts_mutex;
       void update_buffer_counts(uint new_count); // NOLINT(build/unsigned)
       double read_average_buffer_counts();

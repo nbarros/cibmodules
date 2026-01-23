@@ -548,7 +548,7 @@ namespace dunedaq::cibmodules {
       ++m_num_total_triggers_received;
       ++m_num_run_triggers_received;
 
-      m_last_readout_timestamp = tcp_packet.word.timestamp;
+      // m_last_readout_timestamp = tcp_packet.word.timestamp;
 
       // we do not need to know anything else
       // ideally, one could add other information such as the direction
@@ -602,7 +602,7 @@ namespace dunedaq::cibmodules {
                                  m_run_number);
 
       send_hsi_event(event);
-      m_sent_hsi_events_counter++;
+      // m_sent_hsi_events_counter++;
      if (connection_closed)
       {
         break ;
@@ -842,7 +842,7 @@ namespace dunedaq::cibmodules {
 
   void CIBModule::generate_opmon_data()
   {
-    dunedaq::cibmodules::cibmoduleinfo::CIBModuleInfo module_info;
+    dunedaq::cibmodules::opmon::CIBModuleInfo module_info;
 
     module_info.num_control_messages_sent = m_num_control_messages_sent.load();
     module_info.num_control_responses_received = m_num_control_responses_received.load();
