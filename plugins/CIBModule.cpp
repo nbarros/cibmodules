@@ -131,10 +131,17 @@ namespace dunedaq::cibmodules {
     {
       if ( con->get_data_type() == datatype_to_string<hsi_frame_t>() )
       {
-        if ( con->UID().find("IoLS")!=std::string::npos)
+        //FIXME: Where does this CIB come from? I am assuming that is comes from the
+        // names of the HSISignalWindow objects in the configuration 
+        if ( con->UID().find("cib")!=std::string::npos)
         {
           m_cib_hsi_data_sender = iom->get_sender<hsi_frame_t>(con->UID());
         }
+        else
+        {
+          TLOG_DEBUG(5) << get_name() << ": Skipping output : " << con->UID();
+        }
+
       } // if data type is HSI Frame
     } // loop over outputs
 
@@ -148,10 +155,15 @@ namespace dunedaq::cibmodules {
     TLOG_DEBUG(TLVL_ENTER_EXIT_METHODS) << get_name() << ": Entering CIB do_configure()";
     TLOG_DEBUG(TLVL_CIB_DEBUG) << get_name() << ": Received configuration fragment : " << args.dump();
 
+    // this returns the structure of the CIBConf object
     auto conf = m_module ->get_configuration();
-    m_receiver_port = m_module->get_board()->get_sockets()->get_receiver()->get_port();
-    m_receiver_timeout = std::chrono::microseconds( m_module->get_board()->get_sockets()->get_receiver()->get_timeout() ) ;
-    auto hostname = conf->get_hostname();
+    // this gets the CIBoardConf object
+    auto board = m_module -> get_board();
+
+    // these are for the local receiver operation
+    m_receiver_port = board->get_port();
+    m_receiver_timeout = std::chrono::milliseconds( conf->get_connection_timeout_ms() ) ;
+    auto hostname = board->get_host();
     TLOG_DEBUG(TLVL_CIB_INFO) << get_name() << ": Board receiver network location (PRELIMINARY) "
         << hostname << ':' << m_receiver_port << std::endl;
 
@@ -181,8 +193,8 @@ namespace dunedaq::cibmodules {
     // identify the trigger bit that this receiver is assigned to
     // We need this to construct the HSI frame, right?
     m_trigger_bit = conf->get_trigger_bit();
-    m_module_instance = conf->get_instance();
-    TLOG_DEBUG(TLVL_CIB_INFO) << get_name() << ": Instance " << m_module_instance << " assigned to trigger bit " << m_trigger_bit
+    // m_module_instance = conf->get_instance();
+    TLOG_DEBUG(TLVL_CIB_INFO) << get_name() << ": Instance assigned to trigger bit " << m_trigger_bit
         << " ( 0x" << std::hex << m_trigger_bit << std::dec << ")";
     
     // init monitoring variables
@@ -191,13 +203,13 @@ namespace dunedaq::cibmodules {
 
     // figure out the identifier of the CIB
     // this is set in the configuration, right?
-    auto board = m_module->get_board();
+    // auto board = m_module->get_board();
     auto geo_id = board->get_geo_id();
     m_det = geo_id->get_detector_id();
     m_crate = geo_id->get_crate_id();
     m_slot = geo_id->get_slot_id();
 
-    const auto& misc = board->get_misc();
+    // const auto& misc = board->get_misc();
     auto session = m_cfg->get_session();
 
     // init trigger counters
@@ -206,7 +218,7 @@ namespace dunedaq::cibmodules {
 
     // network connection to the CIB module
     boost::asio::ip::tcp::resolver resolver( m_control_ios );
-    boost::asio::ip::tcp::resolver::query query( hostname,
+    boost::asio::ip::tcp::resolver::query query( conf->get_hostname(),
         std::to_string(conf->get_control_connection_port()) ) ; //"np04-iols-cib-01", 8991
     boost::asio::ip::tcp::resolver::iterator iter = resolver.resolve(query) ;
 
@@ -244,10 +256,12 @@ namespace dunedaq::cibmodules {
       iter = resolver.resolve(query_for_local);
 
       // create the json string out of the config fragment
+      // replacing the receiver address with the one that we just calculated
       nlohmann::json config;
       try
       {
-        to_json(config, m_module->get_board()->get_cib_json(*session, iter->endpoint().address().to_string()));
+        to_json(config, board->get_cib_json(*session, iter->endpoint().address().to_string()));
+        // to_json(config, m_module->get_board()->get_cib_json(*session, iter->endpoint().address().to_string()));
         auto json_dump = config.dump();
         TLOG() << "Sending configuration: " << json_dump;
       }
