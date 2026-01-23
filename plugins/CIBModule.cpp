@@ -13,10 +13,7 @@
 #include "appmodel/CIBConf.hpp"
 #include "appmodel/CIBCalibrationStream.hpp"
 #include "appmodel/CIBoardConf.hpp"
-#include "appmodel/CIBRandomTrigger.hpp"
 #include "appmodel/CIBTrigger.hpp"
-#include "appmodel/CIBSockets.hpp"
-#include "appmodel/CIBReceiverSocket.hpp"
 
 #include "CIBModule.hpp"
 #include "CIBModuleIssues.hpp"
