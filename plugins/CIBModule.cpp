@@ -58,19 +58,19 @@ namespace dunedaq::cibmodules {
                 , m_receiver_ios()
                 , m_receiver_socket(m_receiver_ios)
                 , m_thread_(std::bind(&CIBModule::do_hsi_work, this, std::placeholders::_1))
-                , m_calibration_stream_enabled(false)
+                , m_calibration_stream_enable(false)
                 , m_calibration_dir("")
                 , m_calibration_prefix("")
                 , m_calibration_file_interval(std::chrono::minutes(15))
                 // metric utilities
                 , m_num_control_messages_sent(0)
                 , m_num_control_responses_received(0)
-                , m_is_running(false)
-                , m_is_configured(false)
+                // , m_is_running(false)
+                // , m_is_configured(false)
                 , m_num_total_triggers_received(0)
                 , m_num_run_triggers_received(0)
-                , m_sent_hsi_events_counter(0)
-                , m_failed_to_send_hsi_events_counter(0)
+                // , m_sent_hsi_events_counter(0)
+                // , m_failed_to_send_hsi_events_counter(0)
 
                 // unsure we actually need this
                 // , m_module_instance(0)
@@ -152,7 +152,6 @@ namespace dunedaq::cibmodules {
   {
 
     TLOG_DEBUG(TLVL_ENTER_EXIT_METHODS) << get_name() << ": Entering CIB do_configure()";
-    TLOG_DEBUG(TLVL_CIB_DEBUG) << get_name() << ": Received configuration fragment : " << args.dump();
 
     // this returns the structure of the CIBConf object
     auto conf = m_module ->get_configuration();
@@ -212,8 +211,8 @@ namespace dunedaq::cibmodules {
     auto session = m_cfg->get_session();
 
     // init trigger counters
-    m_run_trigger_counter.store(0);
-    m_total_trigger_counter.store(0);
+    m_num_run_triggers_received.store(0);
+    // m_num_total_triggers_received.store(0);
 
     // network connection to the CIB module
     boost::asio::ip::tcp::resolver resolver( m_control_ios );
@@ -259,7 +258,7 @@ namespace dunedaq::cibmodules {
       nlohmann::json config;
       try
       {
-        to_json(config, board->get_cib_json(*session, iter->endpoint().address().to_string()));
+        nlohmann::to_json(config, board->get_cib_json(*session, iter->endpoint().address().to_string()));
         // to_json(config, m_module->get_board()->get_cib_json(*session, iter->endpoint().address().to_string()));
         auto json_dump = config.dump();
         TLOG() << "Sending configuration: " << json_dump;
@@ -373,12 +372,11 @@ namespace dunedaq::cibmodules {
 
       // -- print the counters for local info
       TLOG() << get_name() << ": CIB trigger counter summary after run [" << m_run_number << "]:\n\n"
-             << "IOLS trigger counter in run : " << m_run_trigger_counter << "\n"
-             << "Global IOLS trigger count   : " << m_num_total_triggers << std::endl;
+             << "IOLS trigger counter in run : " << m_num_run_triggers_received << "\n"
+             << "Global IOLS trigger count   : " << m_num_total_triggers_received << std::endl;
 
       // reset counters
-      m_run_trigger_counter = 0;
-
+      m_num_run_triggers_received = 0;
       TLOG_DEBUG(TLVL_ENTER_EXIT_METHODS) << get_name() << ": Exiting do_stop() method";
     }
 
@@ -547,8 +545,9 @@ namespace dunedaq::cibmodules {
       } // word printing in calibration stream
 
       TLOG_DEBUG(TLVL_CIB_DEBUG) << get_name() << "Received IoLS trigger word!";
-      ++m_num_total_triggers;
-      ++m_run_trigger_counter;
+      ++m_num_total_triggers_received;
+      ++m_num_run_triggers_received;
+
       m_last_readout_timestamp = tcp_packet.word.timestamp;
 
       // we do not need to know anything else
@@ -579,7 +578,7 @@ namespace dunedaq::cibmodules {
        * into an index
        */
       hsi_struct[5] = m_trigger_bit;            // trigger_map;
-      hsi_struct[6] = m_run_trigger_counter;    // m_generated_counter;
+      hsi_struct[6] = m_num_run_triggers_received.load();    // m_generated_counter;
 
       TLOG_DEBUG(TLVL_CIB_DEBUG) << get_name() << ": Formed HSI_FRAME_STRUCT for hlt "
           << std::hex
@@ -599,7 +598,7 @@ namespace dunedaq::cibmodules {
       dfmessages::HSIEvent event(m_det,
                                  m_trigger_bit,
                                  tcp_packet.word.timestamp,
-                                 m_run_trigger_counter,
+                                 m_num_run_triggers_received.load(),
                                  m_run_number);
 
       send_hsi_event(event);
