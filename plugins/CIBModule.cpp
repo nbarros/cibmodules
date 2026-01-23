@@ -152,10 +152,34 @@ namespace dunedaq::cibmodules {
     m_receiver_port = m_module->get_board()->get_sockets()->get_receiver()->get_port();
     m_receiver_timeout = std::chrono::microseconds( m_module->get_board()->get_sockets()->get_receiver()->get_timeout() ) ;
     auto hostname = conf->get_hostname();
-    TLOG_DEBUG(TLVL_CIB_INFO) << get_name() << ": Board receiver network location "
+    TLOG_DEBUG(TLVL_CIB_INFO) << get_name() << ": Board receiver network location (PRELIMINARY) "
         << hostname << ':' << m_receiver_port << std::endl;
-    
+
+    // Check if port is already in use, to try to avoid future conflicts
+    unsigned short port = m_receiver_port;
+    while (check_port_in_use(port)) 
+    {
+      // the problem is that if the port is in use, the CIB will be sending the data to the wrong place
+      // there is little point in continuing
+      std::ostringstream msg("");
+      msg << "Listener port [" << port << "] is in use by someone else. Trying another.";
+      ers::warning(CIBMessage(ERS_HERE, msg.str()));
+      port++;
+    }
+    if (port != m_receiver_port)
+    {
+      std::ostringstream msg("");
+      msg << "Listener port [" << m_receiver_port << "] is in use. Relocating to port [" << port << "]";
+      ers::warning(CIBMessage(ERS_HERE, msg.str()));
+      m_receiver_port = port;
+    }
+    else
+    {
+      TLOG_DEBUG(TLVL_CIB_INFO) << get_name() << ": Listener port " << m_receiver_port << " is available." << std::endl;
+    }
+
     // identify the trigger bit that this receiver is assigned to
+    // We need this to construct the HSI frame, right?
     m_trigger_bit = conf->get_trigger_bit();
     m_module_instance = conf->get_instance();
     TLOG_DEBUG(TLVL_CIB_INFO) << get_name() << ": Instance " << m_module_instance << " assigned to trigger bit " << m_trigger_bit
@@ -166,6 +190,7 @@ namespace dunedaq::cibmodules {
     m_num_control_responses_received = 0;
 
     // figure out the identifier of the CIB
+    // this is set in the configuration, right?
     auto board = m_module->get_board();
     auto geo_id = board->get_geo_id();
     m_det = geo_id->get_detector_id();
@@ -342,8 +367,7 @@ namespace dunedaq::cibmodules {
       TLOG_DEBUG(TLVL_ENTER_EXIT_METHODS) << get_name() << ": Exiting do_stop() method";
     }
 
-  // this method is completely new
-  // in fact, it is where most of the work is really done
+  // this is where most of the work is really done
   void
   CIBModule::do_hsi_work(std::atomic<bool>& running_flag)
   {
@@ -364,20 +388,25 @@ namespace dunedaq::cibmodules {
     // check that this port is still available
     while(check_port_in_use(port))
     {
-      port++;
+      // the problem is that if the port is in use, the CIB will be sending the data to the wrong place
+      // there is little point in continuing
+      std::ostringstream msg("");
+      msg << "Listener port [" << port << "] is in use by someone else. Failing.";
+      ers::error(CIBMessage(ERS_HERE, msg.str()));
+      // port++;
     }
     // check if the port is different from the configured one
-    if (port != m_receiver_port)
-    {
-      std::ostringstream msg("");
-      msg << "Listener port [" << m_receiver_port << "] is in use. Relocating to port [" << port << "]";
-      ers::warning(CIBMessage(ERS_HERE, msg.str()));
-      m_receiver_port = port;
-    }
-    else
-    {
-      TLOG_DEBUG(TLVL_CIB_INFO) << get_name() << ": Will set up the listener on port " << port << std::endl;
-    }
+    // if (port != m_receiver_port)
+    // {
+    //   std::ostringstream msg("");
+    //   msg << "Listener port [" << m_receiver_port << "] is in use. Relocating to port [" << port << "]";
+    //   ers::warning(CIBMessage(ERS_HERE, msg.str()));
+    //   m_receiver_port = port;
+    // }
+    // else
+    // {
+    TLOG_DEBUG(TLVL_CIB_INFO) << get_name() << ": Will set up the listener on port " << port << std::endl;
+    // }
 
     boost::asio::ip::tcp::acceptor acceptor(m_receiver_ios,boost::asio::ip::tcp::endpoint(boost::asio::ip::tcp::v4(),port ));
     TLOG_DEBUG(0) << get_name() << ": Waiting for an incoming connection on port " << m_receiver_port << std::endl;
