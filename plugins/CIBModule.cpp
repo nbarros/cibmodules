@@ -273,8 +273,9 @@ namespace dunedaq::cibmodules {
       // replacing the receiver address with the one that we just calculated
       try
       {
-        nlohmann::to_json(config, board->get_cib_json(*session, hostname, m_receiver_port));
+        // nlohmann::to_json(config, board->get_cib_json(*session, hostname, m_receiver_port));
         // to_json(config, m_module->get_board()->get_cib_json(*session, iter->endpoint().address().to_string()));
+        config = board->get_cib_json(*session, hostname, m_receiver_port);
       }
       catch (nlohmann::json::exception &e)
       {
@@ -295,10 +296,11 @@ namespace dunedaq::cibmodules {
     else
     {
       /* just use the configuration information */
-      nlohmann::to_json(config, board->get_cib_json(*session));
+      // nlohmann::to_json(config, board->get_cib_json(*session));
+      config = board->get_cib_json(*session);
     }
     auto json_dump = config.dump();
-    TLOG(1) << "Sending configuration: " << json_dump;
+    TLOG(1) << "Sending configuration: [" << json_dump << "]";
 
     TLOG_DEBUG(TLVL_CIB_INFO) << get_name() << ": Sending configuration to CIB board";
     send_config(config.dump());
