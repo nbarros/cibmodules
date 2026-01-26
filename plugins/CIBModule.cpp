@@ -158,36 +158,7 @@ namespace dunedaq::cibmodules {
     // this gets the CIBoardConf object
     auto board = m_module -> get_board();
 
-    // these are for the local receiver operation
-    m_receiver_port = board->get_port();
-    m_receiver_timeout = std::chrono::milliseconds( conf->get_connection_timeout_ms() ) ;
-    auto hostname = board->get_host();
-    TLOG_DEBUG(TLVL_CIB_INFO) << get_name() << ": Board receiver network location (PRELIMINARY) "
-        << hostname << ':' << m_receiver_port << std::endl;
-
-    // Check if port is already in use, to try to avoid future conflicts
-    unsigned short port = m_receiver_port;
-    while (check_port_in_use(port)) 
-    {
-      // the problem is that if the port is in use, the CIB will be sending the data to the wrong place
-      // there is little point in continuing
-      std::ostringstream msg("");
-      msg << "Listener port [" << port << "] is in use by someone else. Trying another.";
-      ers::warning(CIBMessage(ERS_HERE, msg.str()));
-      port++;
-    }
-    if (port != m_receiver_port)
-    {
-      std::ostringstream msg("");
-      msg << "Listener port [" << m_receiver_port << "] is in use. Relocating to port [" << port << "]";
-      ers::warning(CIBMessage(ERS_HERE, msg.str()));
-      m_receiver_port = port;
-    }
-    else
-    {
-      TLOG_DEBUG(TLVL_CIB_INFO) << get_name() << ": Listener port " << m_receiver_port << " is available." << std::endl;
-    }
-
+  
     // identify the trigger bit that this receiver is assigned to
     // We need this to construct the HSI frame, right?
     m_trigger_bit = conf->get_trigger_bit();
@@ -216,8 +187,8 @@ namespace dunedaq::cibmodules {
 
     // network connection to the CIB module
     boost::asio::ip::tcp::resolver resolver( m_control_ios );
-    boost::asio::ip::tcp::resolver::query query( conf->get_hostname(),
-        std::to_string(conf->get_control_connection_port()) ) ; //"np04-iols-cib-01", 8991
+    boost::asio::ip::tcp::resolver::query query( conf->get_host(),
+        std::to_string(conf->get_port()) ) ; //"np04-iols-cib-02", 8992
     boost::asio::ip::tcp::resolver::iterator iter = resolver.resolve(query) ;
 
     m_control_endpoint = iter->endpoint();
@@ -249,19 +220,57 @@ namespace dunedaq::cibmodules {
       m_calibration_file_interval = std::chrono::duration_cast<decltype(m_calibration_file_interval)>(std::chrono::seconds(stream_conf->get_update_period_s()));
     }
 
+    // these are for the local receiver operation
+    m_receiver_port = board->get_port();
+    m_receiver_timeout = std::chrono::milliseconds(conf->get_connection_timeout_ms());
+    auto hostname = board->get_host();
+    TLOG_DEBUG(TLVL_CIB_INFO) << get_name() << ": Default board receiver network location (PRELIMINARY) "
+                              << hostname << ':' << m_receiver_port << std::endl;
+
+    // if the host is localhost, we need to resolve it to the actual hostname
+    if (hostname == "localhost")
+    {
+      boost::asio::ip::tcp::resolver resolver(m_receiver_ios);
+      // Check if port is already in use, to try to avoid future conflicts
+      unsigned short port = m_receiver_port;
+      while (check_port_in_use(port))
+      {
+        // the problem is that if the port is in use, the CIB will be sending the data to the wrong place
+        // there is little point in continuing
+        std::ostringstream msg("");
+        msg << "Listener port [" << port << "] is in use by someone else. Trying another.";
+        ers::warning(CIBMessage(ERS_HERE, msg.str()));
+        port++;
+      }
+      if (port != m_receiver_port)
+      {
+        std::ostringstream msg("");
+        msg << "Listener port [" << m_receiver_port << "] is in use. Relocating to port [" << port << "]";
+        ers::warning(CIBMessage(ERS_HERE, msg.str()));
+        m_receiver_port = port;
+      }
+      else
+      {
+        TLOG_DEBUG(TLVL_CIB_INFO) << get_name() << ": Listener port " << m_receiver_port << " is available." << std::endl;
+      }
+
       // at this we have to find the hostname to tell the board where to send the data
       boost::asio::ip::tcp::resolver::query query_for_local(boost::asio::ip::host_name(), "");
       iter = resolver.resolve(query_for_local);
+
+      TLOG_DEBUG(TLVL_CIB_INFO) << get_name() << ": Resolved localhost to "
+                                << iter->endpoint().address().to_string() << std::endl;
+      hostname = iter->endpoint().address().to_string();
 
       // create the json string out of the config fragment
       // replacing the receiver address with the one that we just calculated
       nlohmann::json config;
       try
       {
-        nlohmann::to_json(config, board->get_cib_json(*session, iter->endpoint().address().to_string()));
+        nlohmann::to_json(config, board->get_cib_json(*session, hostname));
         // to_json(config, m_module->get_board()->get_cib_json(*session, iter->endpoint().address().to_string()));
         auto json_dump = config.dump();
-        TLOG() << "Sending configuration: " << json_dump;
+        TLOG(1) << "Sending configuration: " << json_dump;
       }
       catch (nlohmann::json::exception &e)
       {
@@ -278,6 +287,7 @@ namespace dunedaq::cibmodules {
         m_is_configured.store(false);
         throw CIBModuleError(ERS_HERE, msg.str());
       }
+      TLOG_DEBUG(TLVL_CIB_INFO) << get_name() << ": Sending configuration to CIB board";
       send_config(config.dump());
       m_is_configured.store(true);
     }
