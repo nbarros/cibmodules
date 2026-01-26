@@ -185,10 +185,13 @@ namespace dunedaq::cibmodules {
     m_num_run_triggers_received.store(0);
     // m_num_total_triggers_received.store(0);
 
+    auto cib_host = conf->get_host();
+    auto cib_port = conf->get_port();
+
     // network connection to the CIB module
     boost::asio::ip::tcp::resolver resolver( m_control_ios );
-    boost::asio::ip::tcp::resolver::query query( conf->get_host(),
-        std::to_string(conf->get_port()) ) ; //"np04-iols-cib-02", 8992
+    boost::asio::ip::tcp::resolver::query query( cib_host,
+        std::to_string(cib_port) ) ; //"np04-iols-cib-02", 8992
     boost::asio::ip::tcp::resolver::iterator iter = resolver.resolve(query) ;
 
     m_control_endpoint = iter->endpoint();
@@ -207,8 +210,8 @@ namespace dunedaq::cibmodules {
       m_is_configured.store(false);
       throw CIBCommunicationError(ERS_HERE, msg.str());
     }
-    TLOG_DEBUG(TLVL_CIB_INFO) << get_name() << ": Successfully connected to CIB control endpoint "
-                              << hostname << ':' << conf->get_control_connection_port() << std::endl;
+    TLOG_DEBUG(TLVL_CIB_INFO) << get_name() << ": Successfully connected to CIB endpoint "
+                              << cib_host << ':' << cib_port << std::endl;
 
     // if necessary, set the calibration stream
     auto stream_conf = conf->get_calibration_stream();
@@ -226,6 +229,10 @@ namespace dunedaq::cibmodules {
     auto hostname = board->get_host();
     TLOG_DEBUG(TLVL_CIB_INFO) << get_name() << ": Default board receiver network location (PRELIMINARY) "
                               << hostname << ':' << m_receiver_port << std::endl;
+
+
+    // config fragment to be sent to the CIB
+    nlohmann::json config;
 
     // if the host is localhost, we need to resolve it to the actual hostname
     if (hostname == "localhost")
@@ -264,13 +271,10 @@ namespace dunedaq::cibmodules {
 
       // create the json string out of the config fragment
       // replacing the receiver address with the one that we just calculated
-      nlohmann::json config;
       try
       {
-        nlohmann::to_json(config, board->get_cib_json(*session, hostname));
+        nlohmann::to_json(config, board->get_cib_json(*session, hostname, m_receiver_port));
         // to_json(config, m_module->get_board()->get_cib_json(*session, iter->endpoint().address().to_string()));
-        auto json_dump = config.dump();
-        TLOG(1) << "Sending configuration: " << json_dump;
       }
       catch (nlohmann::json::exception &e)
       {
@@ -287,10 +291,19 @@ namespace dunedaq::cibmodules {
         m_is_configured.store(false);
         throw CIBModuleError(ERS_HERE, msg.str());
       }
-      TLOG_DEBUG(TLVL_CIB_INFO) << get_name() << ": Sending configuration to CIB board";
-      send_config(config.dump());
-      m_is_configured.store(true);
     }
+    else
+    {
+      /* just use the configuration information */
+      nlohmann::to_json(config, board->get_cib_json(*session));
+    }
+    auto json_dump = config.dump();
+    TLOG(1) << "Sending configuration: " << json_dump;
+
+    TLOG_DEBUG(TLVL_CIB_INFO) << get_name() << ": Sending configuration to CIB board";
+    send_config(config.dump());
+    m_is_configured.store(true);
+  }
 
     void
     CIBModule::do_start(const CommandData_t &startobj)
