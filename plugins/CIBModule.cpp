@@ -132,8 +132,10 @@ namespace dunedaq::cibmodules {
       {
         //FIXME: Where does this CIB come from? I am assuming that is comes from the
         // names of the HSISignalWindow objects in the configuration 
-        if ( con->UID().find("CIB")!=std::string::npos)
+        if ( (con->UID().find("CIB")!=std::string::npos) || 
+             (con->UID().find("cib")!=std::string::npos) )
         {
+          TLOG() << get_name() << ": Setting up HSI Frame output : " << con->UID() << std::endl;
           m_cib_hsi_data_sender = iom->get_sender<hsi_frame_t>(con->UID());
         }
         else
@@ -605,16 +607,26 @@ namespace dunedaq::cibmodules {
       hsi_struct[5] = m_trigger_bit;            // trigger_map;
       hsi_struct[6] = m_num_run_triggers_received.load();    // m_generated_counter;
 
-      TLOG_DEBUG(TLVL_CIB_DEBUG) << get_name() << ": Formed HSI_FRAME_STRUCT for hlt "
-          << std::hex
-          << "0x"   << hsi_struct[0]
-          << ", 0x" << hsi_struct[1]
-          << ", 0x" << hsi_struct[2]
-          << ", 0x" << hsi_struct[3]
-          << ", 0x" << hsi_struct[4]
-          << ", 0x" << hsi_struct[5]
-          << ", 0x" << hsi_struct[6]
-          << "\n";
+      TLOG() << get_name() << ": CIB HSI Frame: "
+             << "0x"   << std::hex << hsi_struct[0]
+             << ", 0x" << hsi_struct[1]
+             << ", 0x" << hsi_struct[2]
+             << ", 0x" << hsi_struct[3]
+             << ", 0x" << hsi_struct[4]
+             << ", 0x" << hsi_struct[5]
+             << ", 0x" << hsi_struct[6]
+             << std::dec << std::endl;
+
+      // TLOG_DEBUG(TLVL_CIB_DEBUG) << get_name() << ": Formed HSI_FRAME_STRUCT for hlt "
+      //     << std::hex
+      //     << "0x"   << hsi_struct[0]
+      //     << ", 0x" << hsi_struct[1]
+      //     << ", 0x" << hsi_struct[2]
+      //     << ", 0x" << hsi_struct[3]
+      //     << ", 0x" << hsi_struct[4]
+      //     << ", 0x" << hsi_struct[5]
+      //     << ", 0x" << hsi_struct[6]
+      //     << "\n";
 
       send_raw_hsi_data(hsi_struct, m_cib_hsi_data_sender.get());
 
