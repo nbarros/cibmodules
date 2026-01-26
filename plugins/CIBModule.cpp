@@ -486,7 +486,7 @@ namespace dunedaq::cibmodules {
 //      }
     }
 
-    TLOG_DEBUG(TLVL_CIB_DEBUG) << get_name() <<  ": Connection received: start reading" << std::endl;
+    TLOG() << get_name() <<  ": Connection received: start reading" << std::endl;
 
     // -- A couple of variables to help in the data parsing
     /**
