@@ -83,6 +83,7 @@ namespace dunedaq::cibmodules {
       std::atomic<bool> m_is_configured;
       std::atomic<bool> m_stop_requested;
 
+      std::string               m_receiver_host;
       /*const */ unsigned int   m_receiver_port;
       std::chrono::microseconds m_receiver_timeout;
       std::atomic<bool>         m_error_state;
@@ -132,8 +133,6 @@ namespace dunedaq::cibmodules {
       // void match_between_buffers(std::queue<content::word::trigger_t> &, std::queue<ts_payload> &, uint64_t, content::word::word_type); // NOLINT
       // static bool check_repeated_word(ts_payload &, ts_payload &, uint64_t); // NOLINT
 
-      // template <typename T>
-      // bool read(T &obj);
       template <typename T>
       bool read(boost::asio::ip::tcp::socket &socket, T &obj);
 
@@ -151,6 +150,12 @@ namespace dunedaq::cibmodules {
       std::chrono::minutes m_calibration_file_interval;
       std::ofstream m_calibration_file;
       std::chrono::steady_clock::time_point m_last_calibration_file_update;
+
+      //
+      // Other auxiliary members
+      //
+
+      bool parse_hex(std::string_view s, std::uint32_t &out);
 
       //
       // metric utilities
@@ -174,18 +179,6 @@ namespace dunedaq::cibmodules {
       using const_run_trigger_counter_t = std::invoke_result<decltype(&general_metric_t::num_run_triggers_received), general_metric_t>::type;
       std::atomic<std::remove_const<const_run_trigger_counter_t>::type> m_num_run_triggers_received;
 
-      // using const_total_trigger_counter_t = std::invoke_result<decltype(&general_metric_t::num_total_triggers_received), general_metric_t>::type;
-      // std::atomic<std::remove_const<const_total_trigger_counter_t>::type> m_num_total_triggers_received;
-
-      // using const_run_trigger_counter_t = std::invoke_result<decltype(&general_metric_t::num_run_triggers_received), general_metric_t>::type;
-      // std::atomic<std::remove_const<const_run_trigger_counter_t>::type> m_num_run_triggers_received;
-
-      // using const_hsi_trigger_counter_t = std::invoke_result<decltype(&general_metric_t::sent_hsi_events_counter), general_metric_t>::type;
-      // std::atomic<std::remove_const<const_hsi_trigger_counter_t>::type> m_sent_hsi_events_counter;
-      // std::atomic<std::remove_const<const_hsi_trigger_counter_t>::type> m_failed_to_send_hsi_events_counter;
-
-      // size_t m_trigger_range = 20;
-// 
       //
       //
       // monitoring data/information
@@ -199,13 +192,9 @@ namespace dunedaq::cibmodules {
       // DAQ-CIB communication statistics
       //
 
-      ///
-      ///
-
       //
       // trigger bit to be written into the HSI event
       //
-      // uint32_t m_module_instance;
       uint32_t m_trigger_bit;
       // flag to hold the start_run until the receiver is ready
       std::atomic<bool> m_receiver_ready;
