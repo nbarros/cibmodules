@@ -104,7 +104,7 @@ namespace dunedaq::cibmodules {
   CIBModule::init(std::shared_ptr<appfwk::ConfigurationManager> cfgMgr)
   {
     TLOG_DEBUG(TLVL_ENTER_EXIT_METHODS) << get_name() << ": Entering init() method";
-    TLOG_DEBUG(TLVL_CIB_DEBUG) << get_name() << ": Init data :  ";// << cfgMgr->get_init_data().dump();
+    // TLOG_DEBUG(TLVL_CIB_DEBUG) << get_name() << ": Init data :  ";// << cfgMgr->get_init_data().dump();
 
     // init the sender
     HSIEventSender::init(cfgMgr);
@@ -627,6 +627,15 @@ namespace dunedaq::cibmodules {
       //     << ", 0x" << hsi_struct[5]
       //     << ", 0x" << hsi_struct[6]
       //     << "\n";
+
+      if (!m_cib_hsi_data_sender)
+      {
+        std::ostringstream msg("");
+        msg << "HSI Data Sender not properly configured! This will go down in flames.";
+        ers::error(CIBCommunicationError(ERS_HERE, msg.str()));
+        // we cannot continue
+        break ;
+      }
 
       send_raw_hsi_data(hsi_struct, m_cib_hsi_data_sender.get());
 
