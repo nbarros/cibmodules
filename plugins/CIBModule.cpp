@@ -13,7 +13,7 @@
 #include "appmodel/CIBConf.hpp"
 #include "appmodel/CIBCalibrationStream.hpp"
 #include "appmodel/CIBoardConf.hpp"
-// #include "appmodel/CIBTrigger.hpp"
+#include "appmodel/CIBTrigger.hpp"
 
 #include "CIBModule.hpp"
 #include "CIBModuleIssues.hpp"
@@ -160,16 +160,16 @@ namespace dunedaq::cibmodules {
 
     // identify the trigger bit that this receiver is assigned to
     // We need this to construct the HSI frame, right?
-    if (!parse_hex(trigger_conf->get_trigger_bit_hex(), m_trigger_bit))
+    if (!parse_hex(trigger_conf->get_trigger_bit(), m_trigger_bit))
     {
       std::ostringstream msg("");
-      msg << get_name() << ": Unable to parse trigger bit hex string : " << trigger_conf->get_trigger_bit_hex();
+      msg << get_name() << ": Unable to parse trigger bit hex string : " << trigger_conf->get_trigger_bit();
       throw CIBModuleError(ERS_HERE, msg.str());
     }
     else
     {
       TLOG_DEBUG(TLVL_CIB_INFO) << get_name() << ": Parsed trigger bit hex string "
-                                << trigger_conf->get_trigger_bit_hex() << " to 0x"
+                                << trigger_conf->get_trigger_bit() << " to 0x"
                                 << std::hex << m_trigger_bit << std::dec
                                 << "[" << trigger_conf->get_trigger_id() << "]";
     }
@@ -310,7 +310,7 @@ namespace dunedaq::cibmodules {
       config = board->get_cib_json(*session);
     }
     auto json_dump = config.dump();
-    LOG_DEBUG(TLVL_CIB_INFO) << get_name() << "Sending configuration: [" << json_dump << "] to CIB board";
+    TLOG_DEBUG(TLVL_CIB_INFO) << get_name() << "Sending configuration: [" << json_dump << "] to CIB board";
     send_config(config.dump());
     m_is_configured.store(true);
   }
