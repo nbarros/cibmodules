@@ -51,6 +51,20 @@ namespace dunedaq::cibmodules {
   // taken from the cib_data_utils
   namespace util {
 
+    uint32_t bitmask(uint32_t highbit, uint32_t lowbit)
+    {
+      // sort the bit order or this fails miserably
+      if (highbit < lowbit)
+      {
+        uint32_t tmp = lowbit;
+        lowbit = highbit;
+        highbit = tmp;
+      }
+
+      uint32_t i = ~0U;
+      return ~(i << highbit << 1) & (i << lowbit);
+    }
+    
     // converts a masked unsigned value into a signed
     // the mask is always assumed to start at 0, so the value has to be shifted right until the lsb aligns with 0
     int32_t cast_to_signed(const uint32_t reg, const uint32_t mask)
