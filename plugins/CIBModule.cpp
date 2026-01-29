@@ -303,6 +303,7 @@ namespace dunedaq::cibmodules {
     auto stream_conf = conf->get_calibration_stream();
     if (stream_conf)
     {
+      TLOG() << "Calibration stream enabled";
       m_calibration_stream_enable = true;
       m_calibration_dir = stream_conf->get_output_directory();
       m_calibration_file_interval = std::chrono::duration_cast<decltype(m_calibration_file_interval)>(std::chrono::seconds(stream_conf->get_update_period_s()));
@@ -453,7 +454,6 @@ namespace dunedaq::cibmodules {
     void
     CIBModule::do_stop(const CommandData_t & /*stopobj*/)
     {
-
       TLOG_DEBUG(TLVL_ENTER_EXIT_METHODS) << get_name() << ": Entering do_stop() method";
       TLOG_DEBUG(TLVL_CIB_DEBUG) << get_name() << ": Sending stop run command" << std::endl;
       // this logic was backwards. We need to tell the CIB to stop first
@@ -466,7 +466,9 @@ namespace dunedaq::cibmodules {
 
       if (send_message("{\"command\":\"stop_run\"}"))
       {
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        // wait for a little to make sure that the other side has time
+        // to send any last triggers and close the connection to the receiver socket
+        std::this_thread::sleep_for(std::chrono::milliseconds(300));
         m_stop_requested.store(true);
         std::this_thread::sleep_for(std::chrono::milliseconds(2));
         TLOG() << get_name() << ": CIB run stopped successfully";
@@ -781,8 +783,16 @@ namespace dunedaq::cibmodules {
 
     if ( receiving_error == boost::asio::error::eof)
     {
-      std::string error_message = "Socket closed: " + receiving_error.message();
-      ers::error(CIBCommunicationError(ERS_HERE, error_message));
+      if (m_stop_requested.load())
+      {
+        TLOG_DEBUG(TLVL_CIB_INFO) << get_name() << ": Socket closed after stop request." << std::endl;
+      }
+      else
+      {
+        std::string error_message = "Socket closed: " + receiving_error.message();
+        ers::error(CIBCommunicationError(ERS_HERE, error_message));
+      }
+      
       return false ;
     }
 
@@ -810,6 +820,14 @@ namespace dunedaq::cibmodules {
     strftime( file_name, sizeof(file_name), "%F_%H.%M.%S.iols.calib", timeinfo );
     std::string global_name = m_calibration_dir + m_calibration_prefix + file_name ;
     m_calibration_file.open( global_name, std::ofstream::binary ) ;
+    if ( ! m_calibration_file.is_open() )
+    {
+      std::ostringstream msg ;
+      msg << get_name() << ": Unable to open calibration stream file: " << global_name ;
+      ers::warning(CIBMessage(ERS_HERE, msg.str()));
+      m_calibration_stream_enable = false ;
+      return ;
+    }
     m_last_calibration_file_update = std::chrono::steady_clock::now();
     // _calibration_file.setf ( std::ios::hex, std::ios::basefield );
     // _calibration_file.unsetf ( std::ios::showbase );
