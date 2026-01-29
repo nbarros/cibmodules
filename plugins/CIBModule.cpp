@@ -572,6 +572,11 @@ namespace dunedaq::cibmodules {
      */
 
     dunedaq::cib::daq::iols_tcp_packet_t tcp_packet;
+    TLOG_DEBUG(TLVL_CIB_DEBUG) << "Checking expected sizes: "
+                               << " sizeof(iols_tcp_packet_t)=" << sizeof(dunedaq::cib::daq::iols_tcp_packet_t)
+                               << " sizeof(iols_trigger_t)=" << sizeof(dunedaq::cib::daq::iols_trigger_t)
+                               << " sizeof(tcp_header_t)=" << sizeof(dunedaq::cib::daq::tcp_header_t)
+                               << std::endl;
 
     //boost::system::error_code receiving_error;
     bool connection_closed = false ;
