@@ -47,6 +47,67 @@
 constexpr uint16_t CIB_HSI_FRAME_VERSION = 0x1; // NOLINT
 namespace dunedaq::cibmodules {
 
+  // some helper functions outside of the class
+  // taken from the cib_data_utils
+  namespace util {
+
+    // converts a masked unsigned value into a signed
+    // the mask is always assumed to start at 0, so the value has to be shifted right until the lsb aligns with 0
+    int32_t cast_to_signed(const uint32_t reg, const uint32_t mask)
+    {
+      // first find the msb in the mask. That will be the signed bit
+      uint32_t msb = 0;
+      int32_t res = 0;
+      for (size_t bit = 31; bit > 0; bit--)
+      {
+        if ((1U << bit) & mask)
+        {
+          msb = bit;
+          break;
+        }
+      }
+      // spdlog::trace("MSB of the mask is {0}",msb);
+      //  check the msb of the register. That is the sign bit
+      if ((1U << msb) & reg)
+      {
+        // spdlog::trace("MSB of the mask is {0}",msb);
+
+        res = bitmask(31, msb + 1); // set all bits to 1 above the mask
+        res = res | (reg & mask);
+        // it is a negative value. Set the msb in the result
+      }
+      else
+      {
+        // it is a positive value. No need to set the sign bit, but still need to
+        // apply the mask or we're carrying out the other bits that may be outside the mask
+        res = (reg & mask);
+      }
+      return res;
+    }
+
+    int32_t get_m1(dunedaq::cib::daq::iols_trigger_t &t)
+    {
+      return cast_to_signed(t.pos_m1, t.bitmask_m1);
+    }
+
+    int32_t get_m2(dunedaq::cib::daq::iols_trigger_t &t)
+    {
+      uint32_t m2_lsb = t.pos_m2_lsb;
+      uint32_t m2_msb = t.pos_m2_msb;
+      uint32_t m2 = (m2_msb << 15) | t.pos_m2_lsb;
+      // the bitmask is the same
+      return cast_to_signed(m2, t.bitmask_m2);
+    }
+
+    int32_t get_m3(dunedaq::cib::daq::iols_trigger_t &t)
+    {
+      return cast_to_signed(t.pos_m3, t.bitmask_m3);
+    }
+  } // namespace util
+
+
+
+
   CIBModule::CIBModule(const std::string& name)
               : hsilibs::HSIEventSender(name)
                 , m_is_running(false)
@@ -563,6 +624,11 @@ namespace dunedaq::cibmodules {
 
       update_buffer_counts(n_words);
 
+      // temporarily print the trigger
+      TLOG() << "TRIGGER : ts " << tcp_packet.word.timestamp
+             << " pos_m1 " << util::get_m1(tcp_packet.word)
+             << " pos_m2 " << util::get_m2(tcp_packet.word)
+             << " pos_m3 " << util::get_m3(tcp_packet.word);
 
       if ( m_calibration_stream_enable )
       {
