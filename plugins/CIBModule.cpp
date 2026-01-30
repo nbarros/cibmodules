@@ -640,10 +640,10 @@ namespace dunedaq::cibmodules {
       update_buffer_counts(n_words);
 
       // temporarily print the trigger
-      TLOG() << "TRIGGER : ts " << tcp_packet.word.timestamp
-             << " pos_m1 " << util::get_m1(tcp_packet.word)
-             << " pos_m2 " << util::get_m2(tcp_packet.word)
-             << " pos_m3 " << util::get_m3(tcp_packet.word);
+      TLOG_DEBUG(TLVL_CIB_DEBUG) << "TRIGGER : ts " << tcp_packet.word.timestamp
+                                 << " pos_m1 " << util::get_m1(tcp_packet.word)
+                                 << " pos_m2 " << util::get_m2(tcp_packet.word)
+                                 << " pos_m3 " << util::get_m3(tcp_packet.word);
 
       if ( m_calibration_stream_enable )
       {
@@ -686,15 +686,15 @@ namespace dunedaq::cibmodules {
       hsi_struct[5] = m_trigger_bit;            // trigger_map;
       hsi_struct[6] = m_num_run_triggers_received.load();    // m_generated_counter;
 
-      TLOG() << get_name() << ": CIB HSI Frame: "
-             << "0x"   << std::hex << hsi_struct[0]
-             << ", 0x" << hsi_struct[1]
-             << ", 0x" << hsi_struct[2]
-             << ", 0x" << hsi_struct[3]
-             << ", 0x" << hsi_struct[4]
-             << ", 0x" << hsi_struct[5]
-             << ", 0x" << hsi_struct[6]
-             << std::dec << std::endl;
+      TLOG_DEBUG(TLVL_CIB_DEBUG) << "CIB HSI Frame: "
+                                 << "0x" << std::hex << hsi_struct[0]
+                                 << ", 0x" << hsi_struct[1]
+                                 << ", 0x" << hsi_struct[2]
+                                 << ", 0x" << hsi_struct[3]
+                                 << ", 0x" << hsi_struct[4]
+                                 << ", 0x" << hsi_struct[5]
+                                 << ", 0x" << hsi_struct[6]
+                                 << std::dec << std::endl;
 
       if (!m_cib_hsi_data_sender)
       {
