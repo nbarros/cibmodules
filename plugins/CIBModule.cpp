@@ -201,8 +201,8 @@ namespace dunedaq::cibmodules {
     {
       if ( con->get_data_type() == datatype_to_string<hsi_frame_t>() )
       {
-        //FIXME: Where does this CIB come from? I am assuming that is comes from the
-        // names of the HSISignalWindow objects in the configuration 
+        // Filter connections by UID: only process those with "CIB" or "cib" in the name
+        // This string comes from the HSISignalWindow UID in the appmodel configuration
         if ( (con->UID().find("CIB")!=std::string::npos) || 
              (con->UID().find("cib")!=std::string::npos) )
         {
