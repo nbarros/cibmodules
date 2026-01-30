@@ -456,19 +456,14 @@ namespace dunedaq::cibmodules {
     {
       TLOG_DEBUG(TLVL_ENTER_EXIT_METHODS) << get_name() << ": Entering do_stop() method";
       TLOG_DEBUG(TLVL_CIB_DEBUG) << get_name() << ": Sending stop run command" << std::endl;
-      // this logic was backwards. We need to tell the CIB to stop first
-      // and let the thread stop after that. We rather not miss any triggers
       
-      // Give the do_work thread a chance to stop before stopping the CIB,
-      // otherwise we end up reading from an empty buffer
-      // m_stop_requested.store(true);
-      // std::this_thread::sleep_for(std::chrono::milliseconds(2));
+      // Set stop flag BEFORE sending command so receiver thread knows to expect EOF
+      m_stop_requested.store(true);
 
       if (send_message("{\"command\":\"stop_run\"}"))
       {
         // Response arrival means CIB has closed its data socket (see Handler::stop_run())
-        // Now signal our receiver thread to stop reading
-        m_stop_requested.store(true);
+        // Receiver thread will detect EOF and exit cleanly
         std::this_thread::sleep_for(std::chrono::milliseconds(2));
         TLOG() << get_name() << ": CIB run stopped successfully";
         m_is_running.store(false);
