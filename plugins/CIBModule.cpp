@@ -466,9 +466,8 @@ namespace dunedaq::cibmodules {
 
       if (send_message("{\"command\":\"stop_run\"}"))
       {
-        // wait for a little to make sure that the other side has time
-        // to send any last triggers and close the connection to the receiver socket
-        std::this_thread::sleep_for(std::chrono::milliseconds(300));
+        // Response arrival means CIB has closed its data socket (see Handler::stop_run())
+        // Now signal our receiver thread to stop reading
         m_stop_requested.store(true);
         std::this_thread::sleep_for(std::chrono::milliseconds(2));
         TLOG() << get_name() << ": CIB run stopped successfully";
@@ -728,7 +727,7 @@ namespace dunedaq::cibmodules {
       }
     }
 
-    // Make sure the CIB run stops before closing socket
+    // Wait for stop signal (which only comes after CIB closed its sender socket)
     while (m_is_running.load())
     {
       std::this_thread::sleep_for(std::chrono::microseconds(100));
