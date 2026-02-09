@@ -37,14 +37,7 @@
 #include <boost/asio.hpp>
 #include <boost/array.hpp>
 
-// #include <atomic>
-// #include <limits>
-// #include <string>
-
 namespace dunedaq::cibmodules {
-
-  // NFB: Do we need this?
-  typedef std::pair<uint64_t, uint64_t> ts_payload; // NOLINT
 
   class CIBModule : public dunedaq::hsilibs::HSIEventSender
   {
@@ -121,6 +114,16 @@ namespace dunedaq::cibmodules {
       dunedaq::utilities::WorkerThread m_thread_;
       void do_hsi_work(std::atomic<bool> &);
 
+      // Simulation mode
+      bool m_simulation_mode;
+      dunedaq::utilities::WorkerThread m_sim_thread_;
+      void do_simulation_work(std::atomic<bool> &);
+      std::atomic<bool> m_sim_configured;
+      std::atomic<bool> m_sim_running;
+      std::string m_sim_receiver_host;
+      unsigned int m_sim_receiver_port;
+      std::chrono::milliseconds m_sim_trigger_interval;
+
       // variables for geo_id to construct the HSI frame
       // These are defined as uint32 in the schema, but given the way the HSI frame is consctructed from this it is unsusable.
       // THe HSI frame uses 4 Bits for the slot and 10 Bits for the crate and 6 for the DetID. So here I'm overiding the types
@@ -128,10 +131,6 @@ namespace dunedaq::cibmodules {
       uint16_t m_crate; // NOLINT
       uint16_t m_slot;  // NOLINT
 
-      // Generate HSI Frame/Event
-      // void send_matched_trigger_word(const content::word::trigger_t &, uint64_t); // NOLINT
-      // void match_between_buffers(std::queue<content::word::trigger_t> &, std::queue<ts_payload> &, uint64_t, content::word::word_type); // NOLINT
-      // static bool check_repeated_word(ts_payload &, ts_payload &, uint64_t); // NOLINT
 
       template <typename T>
       bool read(boost::asio::ip::tcp::socket &socket, T &obj);

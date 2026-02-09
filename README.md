@@ -292,6 +292,7 @@ In OKS database configuration:
     <cib_host>np04-iols-cib-02.cern.ch</cib_host>
     <cib_port>8992</cib_port>
     <connection_timeout_ms>1000</connection_timeout_ms>
+    <simulation_mode>false</simulation_mode>
     <!-- Trigger mapping -->
     <cib_trigger class="CIBTrigger">
       <trigger_id>iols_laser</trigger_id>
