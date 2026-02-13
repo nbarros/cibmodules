@@ -228,6 +228,9 @@ namespace dunedaq::cibmodules {
     auto cib_host = conf->get_cib_host();
     auto cib_port = conf->get_cib_port();
 
+    TLOG_DEBUG(TLVL_CIB_INFO) << get_name() << ": Connecting to CIB at "
+                              << cib_host << ':' << cib_port << std::endl;
+
     // network connection to the CIB module
     boost::asio::ip::tcp::resolver resolver( m_control_ios );
     boost::asio::ip::tcp::resolver::query query( cib_host,std::to_string(cib_port) ) ; //"np04-iols-cib-02", 8992
