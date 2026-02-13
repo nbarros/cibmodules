@@ -109,6 +109,17 @@ namespace dunedaq::cibmodules {
       dunedaq::utilities::WorkerThread m_thread_;
       void do_hsi_work(std::atomic<bool> &);
 
+      // Simulation mode
+      bool m_simulation_mode = false;
+      dunedaq::utilities::WorkerThread m_sim_thread_;
+      void do_simulation_work(std::atomic<bool> &);
+      std::atomic<bool> m_sim_configured;
+      std::atomic<bool> m_sim_running;
+      std::string m_sim_receiver_host;
+      unsigned int m_sim_receiver_port;
+      unsigned int m_sim_control_port;
+      std::chrono::milliseconds m_sim_trigger_interval;
+
       // variables for geo_id to construct the HSI frame
       // These are defined as uint32 in the schema, but given the way the HSI frame is consctructed from this it is unsusable.
       // THe HSI frame uses 4 Bits for the slot and 10 Bits for the crate and 6 for the DetID. So here I'm overiding the types

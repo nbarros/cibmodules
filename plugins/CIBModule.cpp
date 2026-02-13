@@ -66,6 +66,16 @@ namespace dunedaq::cibmodules {
                 , m_receiver_ios()
                 , m_receiver_socket(m_receiver_ios)
                 , m_thread_(std::bind(&CIBModule::do_hsi_work, this, std::placeholders::_1))
+                // simulation mode parameters
+                , m_simulation_mode(false)
+                , m_sim_thread_(std::bind(&CIBModule::do_simulation_work, this, std::placeholders::_1))
+                , m_sim_configured(false)
+                , m_sim_running(false)
+                , m_sim_receiver_host("")
+                , m_sim_receiver_port(0)
+                , m_sim_control_port(0)
+                , m_sim_trigger_interval(std::chrono::milliseconds(100))
+                // calibration stream parameters
                 , m_calibration_stream_enable(false)
                 , m_calibration_dir("")
                 , m_calibration_prefix("")
@@ -97,6 +107,12 @@ namespace dunedaq::cibmodules {
       // this should also take care of closing the streaming socket
       do_stop(stopobj);
     }
+    if (m_simulation_mode && m_sim_thread_.thread_running())
+    {
+      m_sim_running.store(false);
+      m_sim_thread_.stop_working_thread();
+    }
+
     TLOG_DEBUG(TLVL_CIB_INFO) << get_name() << ": Closing the control socket " << std::endl;
     m_control_socket.close() ;
 
@@ -161,6 +177,20 @@ namespace dunedaq::cibmodules {
     // this gets the CIBoardConf object
     auto board = m_module -> get_board();
 
+    m_simulation_mode = conf->get_simulation_mode();
+    if (m_simulation_mode)
+    {
+      TLOG() << get_name() << ": *** SIMULATION MODE ENABLED ***";
+      m_sim_control_port = conf->get_cib_port();
+      m_sim_configured.store(false);
+      m_sim_running.store(false);
+      if (!m_sim_thread_.thread_running())
+      {
+        TLOG() << get_name() << ": starting simulation thread (simulated CIB)";
+        m_sim_thread_.start_working_thread();
+      }
+    }
+
     auto trigger_conf = conf->get_cib_trigger();
 
     // identify the trigger bit that this receiver is assigned to
@@ -204,6 +234,13 @@ namespace dunedaq::cibmodules {
     boost::asio::ip::tcp::resolver::iterator iter = resolver.resolve(query) ;
 
     m_control_endpoint = iter->endpoint();
+    // if we're in simulation mode, we want to wait a bit before trying to connect, 
+    // to give the simulated CIB time to start up and be ready to accept the connection. 
+    if (m_simulation_mode)
+    {
+      std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+
     // attempt the connection.
     try
     {
@@ -907,6 +944,230 @@ namespace dunedaq::cibmodules {
     // should we also publish specific trigger info? 
     // doesn't seem necessary at this time
 
+  }
+
+  void
+  CIBModule::do_simulation_work(std::atomic<bool>& running_flag)
+  {
+    TLOG() << get_name() << " [SIMULATION]: Starting simulated CIB thread";
+
+    unsigned int control_port = m_sim_control_port;
+    if (control_port == 0)
+    {
+      control_port = 8992;
+    }
+
+    boost::asio::io_service control_ios;
+    boost::asio::ip::tcp::acceptor control_acceptor(
+      control_ios,
+      boost::asio::ip::tcp::endpoint(boost::asio::ip::tcp::v4(), control_port));
+    boost::asio::ip::tcp::socket control_socket(control_ios);
+
+    TLOG() << get_name() << " [SIMULATION]: Listening for control connections on port " << control_port;
+    boost::system::error_code ec;
+    control_acceptor.accept(control_socket, ec);
+
+    if (ec)
+    {
+      TLOG() << get_name() << " [SIMULATION]: Failed to accept control connection: " << ec.message();
+      return;
+    }
+
+    TLOG() << get_name() << " [SIMULATION]: Control connection established";
+
+    boost::asio::io_service data_ios;
+    boost::asio::ip::tcp::socket data_socket(data_ios);
+    bool data_connected = false;
+
+    uint8_t sequence_id = 0;
+    int32_t sim_m1_pos = 0;
+    int32_t sim_m2_pos = 0;
+    int32_t sim_m3_pos = 0;
+
+    while (running_flag.load())
+    {
+      boost::array<char, 4096> recv_buffer;
+      std::size_t bytes_available = control_socket.available(ec);
+
+      if (bytes_available > 0)
+      {
+        std::size_t len = control_socket.read_some(boost::asio::buffer(recv_buffer), ec);
+        if (!ec && len > 0)
+        {
+          std::string message(recv_buffer.data(), len);
+          TLOG_DEBUG(TLVL_CIB_DEBUG) << get_name() << " [SIMULATION]: Received: " << message;
+          try
+          {
+            nlohmann::json cmd = nlohmann::json::parse(message);
+            std::string command = cmd["command"];
+
+            nlohmann::json response;
+            response["status"] = "ok";
+            response["feedback"] = nlohmann::json::array();
+
+            if (command == "config")
+            {
+              TLOG() << get_name() << " [SIMULATION]: Processing config command";
+              if (cmd.contains("config"))
+              {
+                auto config = cmd["config"];
+                if (config.contains("cib") && config["cib"].contains("sockets") &&
+                    config["cib"]["sockets"].contains("receiver"))
+                {
+                  m_sim_receiver_host = config["cib"]["sockets"]["receiver"]["host"];
+                  m_sim_receiver_port = config["cib"]["sockets"]["receiver"]["port"];
+                  TLOG() << get_name() << " [SIMULATION]: Configured to send data to "
+                         << m_sim_receiver_host << ":" << m_sim_receiver_port;
+                }
+              }
+
+              if (m_sim_receiver_host.empty())
+              {
+                m_sim_receiver_host = "127.0.0.1";
+              }
+              if (m_sim_receiver_port == 0)
+              {
+                m_sim_receiver_port = m_receiver_port;
+              }
+
+              m_sim_configured.store(true);
+              nlohmann::json info_msg;
+              info_msg["type"] = "info";
+              info_msg["message"] = "Simulated CIB configured successfully";
+              response["feedback"].push_back(info_msg);
+            }
+            else if (command == "start_run")
+            {
+              TLOG() << get_name() << " [SIMULATION]: Processing start_run command";
+              if (!m_sim_configured.load())
+              {
+                nlohmann::json error_msg;
+                error_msg["type"] = "error";
+                error_msg["message"] = "Simulated CIB not configured";
+                response["feedback"].push_back(error_msg);
+                response["status"] = "error";
+              }
+              else
+              {
+                try
+                {
+                  boost::asio::ip::tcp::resolver resolver(data_ios);
+                  boost::asio::ip::tcp::resolver::query query(
+                    m_sim_receiver_host,
+                    std::to_string(m_sim_receiver_port));
+                  boost::asio::ip::tcp::resolver::iterator endpoint_iter = resolver.resolve(query);
+                  boost::asio::connect(data_socket, endpoint_iter, ec);
+
+                  if (!ec)
+                  {
+                    data_connected = true;
+                    m_sim_running.store(true);
+                    sequence_id = 0;
+                    TLOG() << get_name() << " [SIMULATION]: Connected to data receiver at "
+                           << m_sim_receiver_host << ":" << m_sim_receiver_port;
+
+                    nlohmann::json info_msg;
+                    info_msg["type"] = "info";
+                    info_msg["message"] = "Simulated CIB run started";
+                    response["feedback"].push_back(info_msg);
+                  }
+                  else
+                  {
+                    nlohmann::json error_msg;
+                    error_msg["type"] = "error";
+                    error_msg["message"] = std::string("Failed to connect to receiver: ") + ec.message();
+                    response["feedback"].push_back(error_msg);
+                    response["status"] = "error";
+                  }
+                }
+                catch (std::exception& e)
+                {
+                  nlohmann::json error_msg;
+                  error_msg["type"] = "error";
+                  error_msg["message"] = std::string("Exception connecting to receiver: ") + e.what();
+                  response["feedback"].push_back(error_msg);
+                  response["status"] = "error";
+                }
+              }
+            }
+            else if (command == "stop_run")
+            {
+              TLOG() << get_name() << " [SIMULATION]: Processing stop_run command";
+              m_sim_running.store(false);
+
+              if (data_connected && data_socket.is_open())
+              {
+                data_socket.close(ec);
+                data_connected = false;
+                TLOG() << get_name() << " [SIMULATION]: Data socket closed";
+              }
+
+              nlohmann::json info_msg;
+              info_msg["type"] = "info";
+              info_msg["message"] = "Simulated CIB run stopped";
+              response["feedback"].push_back(info_msg);
+            }
+
+            std::string response_str = response.dump();
+            boost::asio::write(control_socket, boost::asio::buffer(response_str), ec);
+          }
+          catch (nlohmann::json::exception& e)
+          {
+            TLOG() << get_name() << " [SIMULATION]: JSON parse error: " << e.what();
+          }
+        }
+      }
+
+      if (m_sim_running.load() && data_connected && data_socket.is_open())
+      {
+        dunedaq::cib::daq::iols_tcp_packet_t packet;
+
+        packet.header.packet_size = sizeof(dunedaq::cib::daq::iols_trigger_t);
+        packet.header.sequence_id = sequence_id++;
+        packet.header.set_version(1);
+
+        sim_m1_pos = 10000 + (sequence_id % 1000) - 500;
+        sim_m2_pos = -5000 + (sequence_id % 800) - 400;
+        sim_m3_pos = 25000 + (sequence_id % 600) - 300;
+
+        packet.word.pos_m1 = sim_m1_pos & 0x3FFFFF;
+
+        uint32_t m2_unsigned = sim_m2_pos & 0x3FFFFF;
+        packet.word.pos_m2_lsb = m2_unsigned & 0x7FFF;
+        packet.word.pos_m2_msb = (m2_unsigned >> 15) & 0x7F;
+
+        packet.word.pos_m3 = sim_m3_pos & 0x1FFFF;
+
+        packet.word.timestamp = dunedaq::cibmodules::util::system_timestamp();
+
+        packet.word.padding = 0;
+
+        boost::asio::write(data_socket, boost::asio::buffer(&packet, sizeof(packet)), ec);
+        if (ec)
+        {
+          TLOG() << get_name() << " [SIMULATION]: Error sending data: " << ec.message();
+          data_connected = false;
+          m_sim_running.store(false);
+        }
+
+        std::this_thread::sleep_for(m_sim_trigger_interval);
+      }
+      else
+      {
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+      }
+    }
+
+    if (data_socket.is_open())
+    {
+      data_socket.close();
+    }
+    if (control_socket.is_open())
+    {
+      control_socket.close();
+    }
+
+    TLOG() << get_name() << " [SIMULATION]: Simulation thread exiting";
   }
 
   bool CIBModule::check_port_in_use(unsigned short port)

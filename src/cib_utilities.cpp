@@ -1,5 +1,6 @@
 #include <cstddef>
 #include <charconv>
+#include <chrono>
 #include <cib_utilities.h>
 
 namespace dunedaq::cibmodules
@@ -90,6 +91,13 @@ namespace dunedaq::cibmodules
 
       // ec=={} means parse OK; ptr at end means no trailing garbage
       return ec == std::errc{} && ptr == s.data() + s.size();
+    }
+
+    std::uint64_t system_timestamp()
+    {
+      auto now = std::chrono::system_clock::now();
+      auto ns = std::chrono::duration_cast<std::chrono::nanoseconds>(now.time_since_epoch());
+      return static_cast<std::uint64_t>(ns.count() / 16);
     }
 
   } // namespace util

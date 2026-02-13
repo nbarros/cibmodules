@@ -25,6 +25,7 @@ namespace dunedaq
       int32_t get_m2(dunedaq::cib::daq::iols_trigger_t &t); 
       int32_t get_m3(dunedaq::cib::daq::iols_trigger_t &t);
       bool parse_hex(std::string_view s, std::uint32_t &out);
+      std::uint64_t system_timestamp();
 
     } // namespace util
   } // namespace cibmodules
