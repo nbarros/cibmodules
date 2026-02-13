@@ -533,11 +533,8 @@ namespace dunedaq::cibmodules {
       m_thread_.stop_working_thread();
 
       // -- print the counters for local info
-      TLOG() << get_name() << ": CIB trigger counter summary after run [" << m_run_number << "]:
-
-"
-             << "IOLS trigger counter in run : " << m_num_run_triggers_received << "
-"
+      TLOG() << get_name() << ": CIB trigger counter summary after run [" << m_run_number << "]:\n"
+             << "IOLS trigger counter in run : " << m_num_run_triggers_received << "\n"
              << "Global IOLS trigger count   : " << m_num_total_triggers_received << std::endl;
 
       // reset counters
