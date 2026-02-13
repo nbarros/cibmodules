@@ -12,6 +12,8 @@ extern "C"
 #include <inttypes.h>
 }
 #include <cstdint>
+#include <cstddef>
+#include <string>
 
 #ifdef CIB_DUNEDAQ
 namespace dunedaq {

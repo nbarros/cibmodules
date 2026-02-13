@@ -32,10 +32,13 @@
 #include <cstdint>
 #include <string_view>
 
+// since cib_data_fmt is shared with the board
+// we need this macro to avoid clashes with the namespaces
+// not the cleanest solution, but it works and avoids maintaining two separate versions of the same struct
 #define CIB_DUNEDAQ 1
 // we may need this to help parse the data format arriving from the CIB
 #include <cib_data_fmt.h>
-
+#include <cib_utilities.h>
 /**
  * @brief Name used by TRACE TLOG calls from this source file
  */
@@ -45,6 +48,7 @@
 #define TLVL_CIB_DEBUG 10
 #define TLVL_CIB_TRACE 15
 
+// as it happens, the frame structure remains unchanged since  NP04
 constexpr uint16_t CIB_HSI_FRAME_VERSION = 0x1; // NOLINT
 namespace dunedaq::cibmodules {
 
@@ -280,7 +284,7 @@ namespace dunedaq::cibmodules {
 
     // identify the trigger bit that this receiver is assigned to
     // We need this to construct the HSI frame
-    if (!parse_hex(trigger_conf->get_trigger_bit(), m_trigger_bit))
+    if (!dunedaq::cibmodules::util::parse_hex(trigger_conf->get_trigger_bit(), m_trigger_bit))
     {
       std::ostringstream msg("");
       msg << get_name() << ": Unable to parse trigger bit hex string : " << trigger_conf->get_trigger_bit();
@@ -288,7 +292,7 @@ namespace dunedaq::cibmodules {
     }
     else
     {
-      TLOG_DEBUG(TLVL_CIB_INFO) << get_name() << ": Parsed trigger bit hex string "
+      TLOG_DEBUG(TLVL_CIB_DEBUG) << get_name() << ": Parsed trigger bit hex string "
                                 << trigger_conf->get_trigger_bit() << " to 0x"
                                 << std::hex << m_trigger_bit << std::dec
                                 << "[" << trigger_conf->get_trigger_id() << "]";
@@ -460,7 +464,7 @@ namespace dunedaq::cibmodules {
       TLOG_DEBUG(TLVL_CIB_INFO) << get_name() << ": Sending start of run command with run number " << m_run_number.load();
       m_thread_.start_working_thread();
 
-      // NFB: There is a potential race condition here: the socket in the working thread
+      // NFB: There was a potential race condition here: the socket in the working thread
       // needs to be in place before the CIB receives order to send data, or we risk having a connection
       // failure, if for some reason the CIB attempts to connect before the working thread is ready to receive.
       if (m_calibration_stream_enable)
@@ -508,7 +512,7 @@ namespace dunedaq::cibmodules {
       // Set stop flag BEFORE sending command so receiver thread knows to expect EOF
       m_stop_requested.store(true);
 
-      if (send_message("{"command":"stop_run"}"))
+      if (send_message("{\"command\":\"stop_run\"}"))
       {
         // Response arrival means CIB has closed its data socket (see Handler::stop_run())
         // Receiver thread will detect EOF and exit cleanly
@@ -555,9 +559,6 @@ namespace dunedaq::cibmodules {
     //connect to socket
     // should we keep everything local or under the class?
     boost::system::error_code ec;
-    //boost::asio::ip::tcp::endpoint( boost::asio::ip::tcp::v4(),m_receiver_port )
-
-    // unsigned short port = m_receiver_port;
 
     // check that this port is still available
     if (check_port_in_use(m_receiver_port))
@@ -619,7 +620,7 @@ namespace dunedaq::cibmodules {
      */
 
     dunedaq::cib::daq::iols_tcp_packet_t tcp_packet;
-    TLOG_DEBUG(TLVL_CIB_DEBUG) << "Checking expected sizes: "
+    TLOG_DEBUG(TLVL_CIB_TRACE) << "Checking expected sizes: "
                                << " sizeof(iols_tcp_packet_t)=" << sizeof(dunedaq::cib::daq::iols_tcp_packet_t)
                                << " sizeof(iols_trigger_t)=" << sizeof(dunedaq::cib::daq::iols_trigger_t)
                                << " sizeof(tcp_header_t)=" << sizeof(dunedaq::cib::daq::tcp_header_t)
@@ -691,7 +692,8 @@ namespace dunedaq::cibmodules {
       update_buffer_counts(n_words);
 
       // temporarily print the trigger
-      // TLOG_DEBUG(TLVL_CIB_DEBUG) << "TRIGGER : ts " << tcp_packet.word.timestamp
+      // I leave this here for debugging purposes, but don´t even keep it in the logs, since it is too verbose. We can always add it back if we need to debug something
+      // TLOG_DEBUG(TLVL_CIB_TRACE) << "TRIGGER : ts " << tcp_packet.word.timestamp
       //                            << " pos_m1 " << util::get_m1(tcp_packet.word)
       //                            << " pos_m2 " << util::get_m2(tcp_packet.word)
       //                            << " pos_m3 " << util::get_m3(tcp_packet.word);
@@ -726,9 +728,9 @@ namespace dunedaq::cibmodules {
 
       // we shall use these 2 sets of 32 bits to define the periscope position
       // pos_m3 == linear stage
-      hsi_struct[3] = tcp_packet.word.pos_m3; // lower 32b 0
+      hsi_struct[3] = dunedaq::cibmodules::util::get_m3(tcp_packet.word); // lower 32b 0
       // pos_m3 == RNN600
-      hsi_struct[4] = tcp_packet.word.pos_m2_msb << 15 | tcp_packet.word.pos_m2_lsb; // upper 32b
+      hsi_struct[4] = dunedaq::cibmodules::util::get_m2(tcp_packet.word); // upper 32b
       /**
        * A note about the 5th entry
        * The trigger bit is actually mapped into a single bit, that is then remapped back
@@ -737,7 +739,8 @@ namespace dunedaq::cibmodules {
       hsi_struct[5] = m_trigger_bit;            // trigger_map;
       hsi_struct[6] = m_num_run_triggers_received.load();    // m_generated_counter;
 
-      // TLOG_DEBUG(TLVL_CIB_DEBUG) << "CIB HSI Frame: "
+      // Same thing here. If something really bad happens, this code can be very useful, but we do not want to print this in the logs, unless strictly necessary, since it is too verbose. 
+      // TLOG_DEBUG(TLVL_CIB_TRACE) << "CIB HSI Frame: "
       //                            << "0x" << std::hex << hsi_struct[0]
       //                            << ", 0x" << hsi_struct[1]
       //                            << ", 0x" << hsi_struct[2]
@@ -758,8 +761,10 @@ namespace dunedaq::cibmodules {
 
       send_raw_hsi_data(hsi_struct, m_cib_hsi_data_sender.get());
 
-      // TODO Nuno Barros Apr-02-2024 : properly fill device id
-      // still need to figure this one out.
+      // TODO Nuno Barros Apr-02-2024 : properly fill device id when someone explains me
+      // how to get it
+      // in fact, this may disappear in the future where the CIB is decoupled from 
+      // the HSI infrastructure
       dfmessages::HSIEvent event(m_det,
                                  m_trigger_bit,
                                  tcp_packet.word.timestamp,
@@ -874,8 +879,6 @@ namespace dunedaq::cibmodules {
       return ;
     }
     m_last_calibration_file_update = std::chrono::steady_clock::now();
-    // _calibration_file.setf ( std::ios::hex, std::ios::basefield );
-    // _calibration_file.unsetf ( std::ios::showbase );
     TLOG_DEBUG(TLVL_CIB_INFO) << get_name() << ": New Calibration Stream file: " << global_name << std::endl ;
   }
 
@@ -920,8 +923,6 @@ namespace dunedaq::cibmodules {
     TLOG_DEBUG(TLVL_CIB_INFO) << get_name() << ": Sending config" << std::endl;
 
     // structure the message to have a common management structure
-    //json receiver = doc.at("ctb").at("sockets").at("receiver");
-
     nlohmann::json conf;
     conf["command"] = "config";
     conf["config"] = nlohmann::json::parse(config);
@@ -1313,6 +1314,20 @@ namespace dunedaq::cibmodules {
     return ec == std::errc{} && ptr == s.data() + s.size();
   }
 
+  bool CIBModule::check_port_in_use(unsigned short port)
+  {
+    using namespace boost::asio;
+    using ip::tcp;
+
+    io_service svc;
+    tcp::acceptor a(svc);
+
+    boost::system::error_code ec;
+    a.open(tcp::v4(), ec) || a.bind({ tcp::v4(), port }, ec);
+    a.close();
+    return ec == error::address_in_use;
+
+  }
 } // namespace dunedaq::cibmodules
 
 DEFINE_DUNE_DAQ_MODULE(dunedaq::cibmodules::CIBModule)
